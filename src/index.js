@@ -51,7 +51,7 @@ async function serviceImage(searchQuery) {
     lightbox.refresh();
     checkIsPageFirst(totalHits);
     showLoadMoreBtn();
-    checkToReachEnd(totalHits);
+    checkIsReachEnd(totalHits);
   } catch (error) {
     showMessage(error.message, '#ffafb4');
   }
@@ -141,7 +141,7 @@ function smoothScroll() {
     behavior: 'smooth',
   });
 }
-function checkToReachEnd(totalHits) {
+function checkIsReachEnd(totalHits) {
   if (totalHits <= page * 40) {
     hideLoadMoreBtn();
     setTimeout(() => {
