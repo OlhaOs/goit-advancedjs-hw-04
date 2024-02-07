@@ -16,18 +16,47 @@ const refs = {
 let page;
 let searchQuery;
 
+const lightbox = new SimpleLightbox('.gallery a', {
+  fadeSpeed: 500,
+  animationSlide: true,
+  widthRatio: 1,
+});
+
 refs.formEl.addEventListener('submit', handleForm);
 refs.loadMoreBtnEl.addEventListener('click', onLoadMoreBtnClick);
 
 function handleForm(e) {
   e.preventDefault();
   page = 1;
-  searchQuery = refs.formEl[0].value;
+  searchQuery = refs.formEl[0].value.trim();
+  if (!searchQuery) {
+    showMessage('Please enter a search query!');
+    return;
+  }
   serviceImage(searchQuery);
   clearForm();
 }
 
-function serviceImage(searchQuery) {
+async function serviceImage(searchQuery) {
+  try {
+    const { data } = await fetchImage(searchQuery);
+    const { hits, totalHits } = data;
+    if (!hits.length) {
+      showMessage(
+        'Sorry, there are no images matching your search query. Please try again.'
+      );
+      return;
+    }
+    insertMarkUp(hits);
+    lightbox.refresh();
+    checkIsPageFirst(totalHits);
+    showLoadMoreBtn();
+    checkToReachEnd(totalHits);
+  } catch (error) {
+    showMessage(error.message, '#ffafb4');
+  }
+}
+async function fetchImage(searchQuery) {
   const param = new URLSearchParams({
     key: API_KEY,
     q: searchQuery,
@@ -38,35 +67,7 @@ function serviceImage(searchQuery) {
     page: page,
   });
 
-  return axios
-    .get(`${BASE_URL}?${param}`)
-    .then(({ data }) => {
-      if (!data.hits.length) {
-        showMessage(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
-        return;
-      }
-      if (page === 1) {
-        showMessage(`Hooray! We found ${data.totalHits} images.`);
-      }
-      refs.galleryEl.insertAdjacentHTML('beforeend', markUp(data.hits));
-      initLightbox();
-      showLoadMoreBtn();
-      if (page !== 1) {
-        smoothScroll();
-      }
-      if (data.totalHits <= page * 40) {
-        hideLoadMoreBtn();
-        setTimeout(() => {
-          showMessage(
-            `We're sorry, but you've reached the end of search results...`,
-            '#ffff99'
-          );
-        }, 2000);
-      }
-    })
-    .catch(error => showMessage(error.message, '#ffafb4'));
+  return await axios.get(`${BASE_URL}?${param}`);
 }
 function markUp(arr) {
   return arr
@@ -102,6 +103,9 @@ function markUp(arr) {
     )
     .join('');
 }
+function insertMarkUp(hits) {
+  refs.galleryEl.insertAdjacentHTML('beforeend', markUp(hits));
+}
 function showMessage(message, color = '#cef6ba') {
   iziToast.info({
     message: message,
@@ -127,19 +131,6 @@ function onLoadMoreBtnClick() {
   page++;
   return serviceImage(searchQuery);
 }
-function initLightbox() {
-  const lightbox = new SimpleLightbox('.gallery a', {
-    fadeSpeed: 500,
-    animationSlide: true,
-    widthRatio: 1,
-  });
-
-  refs.galleryEl.addEventListener('click', e => {
-    if (e.target.classList.contains('photo-card')) {
-      lightbox.open();
-    }
-  });
-}
 function smoothScroll() {
   const { height: cardHeight } = document
     .querySelector('.gallery')
@@ -149,4 +140,23 @@ function smoothScroll() {
     top: cardHeight * 2,
     behavior: 'smooth',
   });
+}
+function checkToReachEnd(totalHits) {
+  if (totalHits <= page * 40) {
+    hideLoadMoreBtn();
+    setTimeout(() => {
+      showMessage(
+        `We're sorry, but you've reached the end of search results...`,
+        '#ffff99'
+      );
+    }, 2000);
+  }
+}
+function checkIsPageFirst(totalHits) {
+  if (page === 1) {
+    showMessage(`Hooray! We found ${totalHits} images.`);
+  }
+  if (page !== 1) {
+    smoothScroll();
+  }
 }
